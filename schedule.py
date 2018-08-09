@@ -6,6 +6,8 @@ import os
 import requests
 import re
 
+from conference_scheduler.resources import Event
+
 REPO = "mozfest-program-2018"
 ORG = "MozillaFestival"
 GITHUB_TOKEN = os.environ["GITHUB_TOKEN"]
@@ -37,9 +39,9 @@ def download_events_list():
     events = r.json()
 
     # Uncomment when want to run on all proposals (700+ issues)
-    # while r.links.get("next"):
-    #     r = requests.get(r.links["next"]["url"])
-    #     events.extend(r.json())
+    while r.links.get("next"):
+        r = requests.get(r.links["next"]["url"])
+        events.extend(r.json())
 
     return events
 
@@ -85,22 +87,23 @@ def split_per_tracks(all_events):
 
     return result
 
-# Create a json file with 42 events: sample (random)
 # Get 6 events per 7 days (42 events)
 def select_events(events):
-        return sample(events, 2)
+        return sample(events, min(42, len(events)))
 
 # Create Event object from the selected events
-"""
->>> from conference_scheduler.resources import Event
->>>
->>> events = {'talk': [
-...     Event(
-...         talk['title'], talk['duration'], demand=None,
-...         tags=talk.get('tags', None))
-...     for talk in events]}
+def convert_mozfestevent_to_event_for_auto_schedule(events):
+    converted_events = []
 
->>> pprint(events['talk'][0:3])"""
+    for event in events:
+        converted_events.append(Event(
+            name=event.title,
+            duration=event.duration,
+            demand=0,
+            tags=[event.track]
+        ))
+
+    return converted_events
 
 # Create a venue with rooms
 
@@ -117,7 +120,9 @@ if __name__ == '__main__':
     events_grouped_by_tracks = split_per_tracks(events_list)
 
     # Select events randomly to create our schedule
-    selected_events = select_events(events_grouped_by_tracks)
+    selected_events = []
+    for track, events in events_grouped_by_tracks.items():
+        selected_events.extend(select_events(events))
 
-
+    print(convert_mozfestevent_to_event_for_auto_schedule(selected_events))
 
